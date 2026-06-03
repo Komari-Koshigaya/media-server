@@ -887,13 +887,20 @@ def page_shell(title: str, body: str, extra_css: str = '') -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0c0d14">
-<link rel="icon" type="image/svg+xml" href="{FAVICON}">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/favicon.svg">
 <title>{safe_title}</title>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 <style>{BASE_CSS}{extra_css}</style>
 </head>
-<body>{body}</body>
+<body>{body}
+<script>
+if('serviceWorker' in navigator){{navigator.serviceWorker.register('/sw.js').catch(function(){{}});}}
+</script>
+</body>
 </html>'''
 
 

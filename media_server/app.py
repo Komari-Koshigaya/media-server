@@ -26,6 +26,7 @@
 
 import argparse
 import logging
+from pathlib import Path
 
 from aiohttp import web
 
@@ -63,6 +64,19 @@ def create_app(server: MediaServer) -> web.Application:
             if any(t in ct for t in ('text/html', 'application/json', 'text/css', 'javascript')):
                 resp.enable_compression()
         return resp
+
+    # ── 静态文件（无需鉴权）─────────────────────────────────────────────
+    STATIC_DIR = Path(__file__).parent / 'static'
+    async def handle_manifest(request):
+        return web.FileResponse(STATIC_DIR / 'manifest.json', headers={'Content-Type': 'application/manifest+json'})
+    async def handle_sw(request):
+        return web.FileResponse(STATIC_DIR / 'sw.js', headers={'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache'})
+    async def handle_favicon(request):
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect rx="20" width="100" height="100" fill="#6c8cff"/><polygon points="40,25 40,75 78,50" fill="white"/></svg>'
+        return web.Response(text=svg, content_type='image/svg+xml')
+    app.router.add_get('/manifest.json', handle_manifest)
+    app.router.add_get('/sw.js', handle_sw)
+    app.router.add_get('/favicon.svg', handle_favicon)
 
     # ── 登录路由（无需鉴权）─────────────────────────────────────────────
     app.router.add_get('/login', server.handle_login_page)
