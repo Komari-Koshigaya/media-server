@@ -790,9 +790,8 @@ async function removeShare(idx) {
         const r = await fetch('/api/shares/' + idx, {method: 'DELETE'});
         const data = await r.json();
         if (data.ok) {
-            document.getElementById('share-' + idx).remove();
             showMsg('已移除', true);
-            setTimeout(() => location.reload(), 800);
+            setTimeout(() => location.href = '/admin?t=' + Date.now(), 500);
         }
     } catch(e) { showMsg('网络错误', false); }
 }

@@ -232,7 +232,8 @@ class MediaServer:
 
         # 无 share 参数，显示共享目录列表首页
         if share_str is None:
-            return web.Response(text=build_home_html(self.shares), content_type='text/html', charset='utf-8')
+            return web.Response(text=build_home_html(self.shares), content_type='text/html', charset='utf-8',
+                                headers={'Cache-Control': 'no-store'})
 
         try:
             share_idx = int(share_str)
@@ -764,7 +765,8 @@ class MediaServer:
             管理后台 HTML 页面
         """
         html_content = build_admin_html(self.shares, get_local_ip(), request.url.port or 8080)
-        return web.Response(text=html_content, content_type='text/html', charset='utf-8')
+        return web.Response(text=html_content, content_type='text/html', charset='utf-8',
+                            headers={'Cache-Control': 'no-store'})
 
     async def handle_api_list(self, request: web.Request) -> web.Response:
         """
