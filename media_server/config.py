@@ -73,24 +73,14 @@ def save_config(cfg: dict) -> None:
 
 def load_shares() -> list[dict]:
     """
-    加载共享目录列表，自动过滤已不存在的目录。
+    加载共享目录列表。
 
     Returns:
         共享目录列表，每项包含 'name' 和 'path' 键。
-        只返回 path 指向的目录仍然存在的项。
+        返回所有配置项，不做过滤（保持与 shares.json 索引一致）。
     """
     cfg = load_config()
-    shares = cfg.get('shares', [])
-    valid = []
-    for s in shares:
-        try:
-            if Path(s['path']).is_dir():
-                valid.append(s)
-            else:
-                logger.info('共享目录已不存在，跳过: %s', s.get('path', ''))
-        except (KeyError, TypeError):
-            logger.warning('共享目录配置格式异常: %s', s)
-    return valid
+    return cfg.get('shares', [])
 
 
 def save_shares(shares: list[dict]) -> None:

@@ -63,15 +63,16 @@ class TestLoadShares:
         assert len(shares) == 1
         assert shares[0]['name'] == '测试目录'
 
-    def test过滤不存在的目录(self, mock_config):
-        """路径已不存在的目录应被过滤掉"""
+    def test返回所有目录(self, mock_config):
+        """load_shares 应返回所有配置的目录，不做过滤"""
         cfg = load_config()
-        cfg['shares'].append({'name': '不存在', 'path': '/nonexistent/path/abc123'})
+        cfg['shares'].append({'name': '额外目录', 'path': '/some/path'})
         from media_server.config import save_config as sc
         sc(cfg)
         shares = load_shares()
-        # 只有测试目录存在
-        assert all(s['name'] != '不存在' for s in shares)
+        # 应包含所有目录，包括路径可能不存在的
+        assert len(shares) == 2
+        assert shares[1]['name'] == '额外目录'
 
 
 class TestGetPassword:
