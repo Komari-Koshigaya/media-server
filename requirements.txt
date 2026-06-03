@@ -1,0 +1,9 @@
+aiohttp>=3.9.0
+imageio-ffmpeg>=0.4.9
+Pillow>=10.0.0
+ebooklib>=0.18
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+PyMuPDF>=1.23.0
+pytest>=7.4.0
+pytest-aiohttp>=1.0.0

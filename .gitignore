@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 运行时配置（含密码）
+shares.json
+
+# 缩略图缓存
+.thumbs/
+
+# 日志文件
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
