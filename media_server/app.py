@@ -54,17 +54,6 @@ def create_app(server: MediaServer) -> web.Application:
     """
     app = web.Application(client_max_size=MAX_UPLOAD_SIZE)
 
-    # ── Gzip 压缩中间件 ──────────────────────────────────────────────────
-    @web.middleware
-    async def gzip_middleware(request, handler):
-        resp = await handler(request)
-        if isinstance(resp, (web.Response, web.FileResponse)):
-            # 只压缩 HTML/JSON/JS/CSS，不压缩文件流
-            ct = resp.content_type or ''
-            if any(t in ct for t in ('text/html', 'application/json', 'text/css', 'javascript')):
-                resp.enable_compression()
-        return resp
-
     # ── 静态文件（无需鉴权）─────────────────────────────────────────────
     STATIC_DIR = Path(__file__).parent / 'static'
     async def handle_manifest(request):
@@ -138,7 +127,6 @@ def create_app(server: MediaServer) -> web.Application:
             html = build_error_html(500, '服务器内部错误，请查看日志')
             return web.Response(text=html, content_type='text/html', charset='utf-8', status=500)
 
-    app.middlewares.append(gzip_middleware)
     app.middlewares.append(error_middleware)
     app.middlewares.append(auth_middleware)
     return app
