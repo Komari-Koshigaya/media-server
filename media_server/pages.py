@@ -950,10 +950,32 @@ def build_home_html(shares: list[dict]) -> str:
     </div>
 </div>
 <div class="file-list">{items}</div>
+<div id="recentArea" style="display:none;max-width:960px;margin:0 auto;padding:0 14px 90px">
+    <div style="font-size:13px;color:var(--text3);padding:12px 0 8px;font-weight:500">最近文件</div>
+    <div id="recentList"></div>
+</div>
 <script>
 document.querySelectorAll('.file-item[href*="share="]').forEach(function(a){{
   var m=a.href.match(/share=(\\d+)/);
   if(m){{ var saved=localStorage.getItem('lastPath_'+m[1]); if(saved) a.href='/'+saved; }}
+}});
+fetch('/api/recent?limit=15').then(function(r){{return r.json();}}).then(function(d){{
+  if(!d.ok||!d.files||!d.files.length) return;
+  var area=document.getElementById('recentArea');
+  var list=document.getElementById('recentList');
+  var icons={{folder:'folder',video:'movie',audio:'music_note',image:'image',text:'description',file:'insert_drive_file'}};
+  var html='';
+  d.files.forEach(function(f,i){{
+    var icon=icons[f.type]||'insert_drive_file';
+    var size=f.size<1024?f.size+' B':f.size<1048576?(f.size/1024).toFixed(1)+' KB':f.size<1073741824?(f.size/1048576).toFixed(1)+' MB':(f.size/1073741824).toFixed(2)+' GB';
+    var href='/play/'+f.share_idx+'/'+encodeURIComponent(f.path);
+    html+='<a class="file-item animate-in" style="animation-delay:'+i*0.03+'s" href="'+href+'">';
+    html+='<div class="icon icon-'+f.type+'"><span class="material-symbols-outlined">'+icon+'</span></div>';
+    html+='<div class="file-info"><div class="file-name">'+f.name+'</div>';
+    html+='<div class="file-meta">'+size+'</div></div></a>';
+  }});
+  list.innerHTML=html;
+  area.style.display='block';
 }});
 </script>'''
     return page_shell('Media Server', body)
@@ -1248,6 +1270,9 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
           document.getElementById('galleryTitle').textContent=(cur+1)+'/'+images.length+' '+t;
           document.getElementById('gPrev').style.display=cur>0?'':'none';
           document.getElementById('gNext').style.display=cur<images.length-1?'':'none';
+          // 预加载前后各一张
+          if(cur>0){{var p=new Image();p.src=images[cur-1].url;}}
+          if(cur<images.length-1){{var n=new Image();n.src=images[cur+1].url;}}
         }}
         if(images.length>1){{
           document.getElementById('gPrev').style.display=cur>0?'':'none';
@@ -1766,9 +1791,11 @@ def build_admin_html(shares: list[dict], local_ip: str, port: int) -> str:
             <div class="stat-num">{len(shares)}</div>
             <div class="stat-label">共享目录</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" style="text-align:center">
             <div class="stat-num" style="font-size:15px">http://{local_ip}:{port}</div>
             <div class="stat-label">手机访问地址</div>
+            <div style="margin-top:10px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=http://{local_ip}:{port}&bgcolor=0c0d14&color=6c8cff" width="140" height="140" style="border-radius:8px" alt="扫码访问"></div>
+            <div style="font-size:11px;color:var(--text3);margin-top:6px">手机扫码直接访问</div>
         </div>
         <div class="stat-card">
             <div class="stat-num" id="statUptime">-</div>

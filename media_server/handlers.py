@@ -1017,6 +1017,50 @@ class MediaServer:
         logger.info('已清理 %d 个缩略图缓存', count)
         return web.json_response({'ok': True, 'count': count})
 
+    async def handle_api_recent(self, request: web.Request) -> web.Response:
+        """
+        最近修改的文件 API。
+
+        GET /api/recent?limit=20
+
+        扫描所有共享目录，返回最近修改的文件列表（按时间倒序）。
+
+        Returns:
+            JSON: {ok: true, files: [{name, size, mtime, share_idx, path, type}]}
+        """
+        try:
+            limit = int(request.query.get('limit', '20'))
+        except ValueError:
+            limit = 20
+        limit = min(limit, 100)
+
+        recent = []
+        for idx, share in enumerate(self.shares):
+            root = Path(share['path'])
+            if not root.is_dir():
+                continue
+            try:
+                for item in root.rglob('*'):
+                    if item.is_file():
+                        try:
+                            stat = item.stat()
+                            rel = str(item.relative_to(root)).replace('\\', '/')
+                            recent.append({
+                                'name': item.name,
+                                'size': stat.st_size,
+                                'mtime': stat.st_mtime,
+                                'share_idx': idx,
+                                'path': rel,
+                                'type': get_file_type(item.name, False),
+                            })
+                        except (PermissionError, OSError):
+                            continue
+            except PermissionError:
+                continue
+
+        recent.sort(key=lambda x: x['mtime'], reverse=True)
+        return web.json_response({'ok': True, 'files': recent[:limit]})
+
     async def handle_api_delete_file(self, request: web.Request) -> web.Response:
         """
         删除文件。

@@ -101,6 +101,7 @@ def create_app(server: MediaServer) -> web.Application:
     app.router.add_delete('/api/shares/{idx}', server.handle_api_remove)
     app.router.add_get('/api/browse', server.handle_api_browse)
     app.router.add_delete('/api/file', server.handle_api_delete_file)
+    app.router.add_get('/api/recent', server.handle_api_recent)
     app.router.add_get('/api/stats', server.handle_api_stats)
     app.router.add_post('/api/password', server.handle_api_change_password)
     app.router.add_post('/api/clear-thumbs', server.handle_api_clear_thumbs)
