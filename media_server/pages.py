@@ -1155,10 +1155,7 @@ function showAutoNext(){{
   }},1000);
 }}
 var endedFired=false;
-art.on('video:ended',function(){{endedFired=true;showAutoNext();}});
-art.on('video:timeupdate',function(){{
-  if(!endedFired&&art.duration>0&&art.currentTime>=art.duration-0.5){{endedFired=true;showAutoNext();}}
-}});
+art.on('video:ended',function(){{if(!endedFired){{endedFired=true;showAutoNext();}}}});
 art.on('video:play',function(){{endedFired=false;cancelAutoNext();}});
 document.addEventListener('keydown',function(e){{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
