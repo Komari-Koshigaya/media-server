@@ -878,7 +878,7 @@ document.getElementById('pickerOverlay').addEventListener('click', e => {
 FAVICON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='20' width='100' height='100' fill='%236c8cff'/><polygon points='40,25 40,75 78,50' fill='white'/></svg>"
 
 
-def page_shell(title: str, body: str, extra_css: str = '') -> str:
+def page_shell(title: str, body: str, extra_css: str = '', extra_head: str = '') -> str:
     safe_title = html_mod.escape(title)
     return f'''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -896,6 +896,7 @@ def page_shell(title: str, body: str, extra_css: str = '') -> str:
 <link rel="apple-touch-icon" href="/favicon.svg">
 <title>{safe_title}</title>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+{extra_head}
 <style>{BASE_CSS}{extra_css}</style>
 </head>
 <body>{body}
@@ -1115,8 +1116,36 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
     dl_url = file_url + ('&' if '?' in file_url else '?') + 'download=1'
     transcode_url = file_url + ('&' if '?' in file_url else '?') + 'transcode=1'
     if file_type == 'video':
+        # ArtPlayer 播放器配置
+        art_cfg = (
+            f"url:'{file_url}',"
+            f"title:'{safe_title}',"
+            "autoplay:true,autoPlayback:false,hotkey:true,pip:true,"
+            "fullscreen:true,fullscreenWeb:false,setting:true,flip:true,"
+            "playbackRate:true,aspectRatio:true,screenshot:true,"
+            "miniProgressBar:true,playsInline:true,mutex:true,"
+            "fastForward:true,lock:true,gesture:true"
+        )
+        # 上下集自动连播 JS
+        video_nav_js = ''
+        if video_list and len(video_list) > 1:
+            video_json = json.dumps(video_list, ensure_ascii=False)
+            cur_vid = next((i for i, v in enumerate(video_list) if v['url'] == file_url), 0)
+            video_nav_js = f'''
+var vids={video_json};var vidx={cur_vid};
+function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length){{vidx=n;art.switchUrl(vids[n].url);art.title=vids[n].name;
+  document.getElementById('vidInfo').textContent=(vidx+1)+'/'+vids.length;
+  document.getElementById('vidPrev').style.display=vidx>0?'':'none';
+  document.getElementById('vidNext').style.display=vidx<vids.length-1?'':'none';}}}}
+art.on('video:ended',function(){{if(vidx<vids.length-1) vidNav(1);}});
+document.addEventListener('keydown',function(e){{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if(e.key==='[') vidNav(-1);
+  if(e.key===']') vidNav(1);
+}});'''
+
         if need_transcode:
-            content = f'''<video controls playsinline id="vid" style="width:100%;flex:1;object-fit:contain;display:none"></video>
+            content = f'''<div id="artContainer" style="width:100%;height:100%;display:none"></div>
             <div id="preFallback" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
                 <span class="material-symbols-outlined" style="font-size:48px;color:#fb923c">warning</span>
                 <p style="font-size:14px">此视频编码不受手机浏览器支持</p>
@@ -1134,44 +1163,33 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
             </div>
             <style>@keyframes spin{{from{{transform:rotate(0deg)}}to{{transform:rotate(360deg)}}}}</style>
             <script>
-            var elapsedTimer=null;
+            var art=null,elapsedTimer=null;
             function startTranscode(){{
               document.getElementById('preFallback').style.display='none';
               document.getElementById('loadingFallback').style.display='flex';
+              document.getElementById('artContainer').style.display='block';
               var sec=0;
               elapsedTimer=setInterval(function(){{
-                sec++;
-                var m=Math.floor(sec/60), s=sec%60;
+                sec++;var m=Math.floor(sec/60),s=sec%60;
                 document.getElementById('elapsed').textContent='已用时 '+(m?m+'分':'')+s+'秒';
               }},1000);
-              var v=document.getElementById('vid');
-              v.src='{transcode_url}';
-              v.style.display='block';
-              v.play();
-              var played=false;
-              v.addEventListener('playing',function(){{
-                played=true;
-                if(elapsedTimer) clearInterval(elapsedTimer);
+              art=new Artplayer({{{art_cfg},container:'#artContainer',url:'{transcode_url}'}});
+              art.on('video:playing',function(){{
+                if(elapsedTimer){{clearInterval(elapsedTimer);elapsedTimer=null;}}
                 document.getElementById('loadingFallback').style.display='none';
-                var pk='vp_'+location.pathname;
-                var ps=localStorage.getItem(pk);
-                if(ps) v.currentTime=parseFloat(ps);
-                var lt=0;
-                v.addEventListener('timeupdate',function(){{ if(v.currentTime-lt>3){{ localStorage.setItem(pk,v.currentTime); lt=v.currentTime; }} }});
-                v.addEventListener('ended',function(){{ localStorage.removeItem(pk); }});
+                var pk='vp_'+location.pathname,ps=localStorage.getItem(pk);
+                if(ps) art.seek=parseFloat(ps);
+                var vol=localStorage.getItem('vol');if(vol) art.volume=parseFloat(vol);
               }});
-              v.addEventListener('error',function(){{
-                if(!played){{
-                  if(elapsedTimer) clearInterval(elapsedTimer);
-                  document.getElementById('loadingFallback').style.display='none';
-                  document.getElementById('preFallback').style.display='flex';
-                }}
-              }});
+              var lt=0;
+              art.on('video:timeupdate',function(){{if(art.currentTime-lt>3){{localStorage.setItem('vp_'+location.pathname,art.currentTime);lt=art.currentTime;}}}});
+              art.on('video:ended',function(){{localStorage.removeItem('vp_'+location.pathname);}});
+              art.on('video:volumechange',function(){{localStorage.setItem('vol',art.volume);}});
+              {video_nav_js}
             }}
             </script>'''
         else:
-            content = f'''<video controls autoplay playsinline id="vid" style="width:100%;flex:1;object-fit:contain"
-                src="{file_url}"></video>
+            content = f'''<div id="artContainer" style="width:100%;flex:1"></div>
             <div id="fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
                 <span class="material-symbols-outlined" style="font-size:48px;color:#f87171">error</span>
                 <p style="font-size:14px" id="errMsg">播放失败</p>
@@ -1180,76 +1198,99 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
                   <a href="{dl_url}" style="padding:12px 28px;background:#6c8cff;color:#fff;border-radius:10px;font-size:14px;text-decoration:none;font-weight:600">下载</a>
                 </div>
             </div>
-            <div class="speed-bar" id="speedBar">
-                <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
-                <button class="speed-btn active" onclick="setSpeed(1)">1x</button>
-                <button class="speed-btn" onclick="setSpeed(1.5)">1.5x</button>
-                <button class="speed-btn" onclick="setSpeed(2)">2x</button>
-            </div>
             <script>
-            var v=document.getElementById('vid');
-            var played=false;
-            v.addEventListener('playing',function(){{played=true;}});
-            v.addEventListener('error',function(){{ showFallback(); }});
-            setTimeout(function(){{ if(!played) showFallback(); }},8000);
-            function showFallback(){{ v.style.display='none'; document.getElementById('fallback').style.display='flex'; document.getElementById('speedBar').style.display='none'; }}
-            var pk='vp_'+location.pathname;
-            var ps=localStorage.getItem(pk);
-            if(ps) v.currentTime=parseFloat(ps);
-            var vol=localStorage.getItem('vol');
-            if(vol) v.volume=parseFloat(vol);
+            var art=new Artplayer({{{art_cfg},container:'#artContainer'}});
+            var pk='vp_'+location.pathname,ps=localStorage.getItem(pk);
+            if(ps) art.seek=parseFloat(ps);
+            var vol=localStorage.getItem('vol');if(vol) art.volume=parseFloat(vol);
             var lt=0;
-            v.addEventListener('timeupdate',function(){{ if(v.currentTime-lt>3){{ localStorage.setItem(pk,v.currentTime); lt=v.currentTime; }} }});
-            v.addEventListener('ended',function(){{ localStorage.removeItem(pk); }});
-            v.addEventListener('volumechange',function(){{ localStorage.setItem('vol',v.volume); }});
-            function setSpeed(r){{ v.playbackRate=r; document.querySelectorAll('.speed-btn').forEach(function(b){{ b.classList.toggle('active',parseFloat(b.textContent)==r); }}); }}
-            document.addEventListener('keydown',function(e){{
-              if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
-              if(e.code==='Space'){{ e.preventDefault(); v.paused?v.play():v.pause(); }}
-              if(e.code==='ArrowLeft'){{ v.currentTime=Math.max(0,v.currentTime-5); }}
-              if(e.code==='ArrowRight'){{ v.currentTime=Math.min(v.duration,v.currentTime+5); }}
-              if(e.code==='ArrowUp'){{ e.preventDefault(); v.volume=Math.min(1,v.volume+0.1); }}
-              if(e.code==='ArrowDown'){{ e.preventDefault(); v.volume=Math.max(0,v.volume-0.1); }}
-              if(e.code==='KeyF'){{ document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen(); }}
-              if(e.code==='KeyM'){{ v.muted=!v.muted; }}
+            art.on('video:timeupdate',function(){{if(art.currentTime-lt>3){{localStorage.setItem(pk,art.currentTime);lt=art.currentTime;}}}});
+            art.on('video:ended',function(){{localStorage.removeItem(pk);}});
+            art.on('video:volumechange',function(){{localStorage.setItem('vol',art.volume);}});
+            art.on('error',function(){{
+              art.destroy();
+              document.getElementById('artContainer').style.display='none';
+              document.getElementById('fallback').style.display='flex';
             }});
+            {video_nav_js}
             </script>'''
     elif file_type == 'audio':
-        content = f'''<audio controls autoplay id="aud" style="width:88%;max-width:480px;margin:auto"
-            src="{file_url}"></audio>
-        <div id="fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
-            <span class="material-symbols-outlined" style="font-size:48px;color:#f87171">error</span>
-            <p style="font-size:14px" id="errMsg">此音频格式不受浏览器支持</p>
-            <a href="{dl_url}" style="padding:12px 28px;background:#6c8cff;color:#fff;border-radius:10px;font-size:14px;text-decoration:none">下载音频</a>
-        </div>
-        <script>
-        var a=document.getElementById('aud');
-        var played=false;
-        a.addEventListener('playing',function(){{played=true;}});
-        a.addEventListener('error',function(){{
-          document.getElementById('errMsg').textContent='播放失败';
-          a.style.display='none'; document.getElementById('fallback').style.display='flex';
-        }});
-        setTimeout(function(){{ if(!played){{ a.style.display='none'; document.getElementById('fallback').style.display='flex'; }} }},8000);
-        var pk='vp_'+location.pathname;
-        var ps=localStorage.getItem(pk);
-        if(ps) a.currentTime=parseFloat(ps);
-        var vol=localStorage.getItem('vol');
-        if(vol) a.volume=parseFloat(vol);
-        var lt=0;
-        a.addEventListener('timeupdate',function(){{ if(a.currentTime-lt>3){{ localStorage.setItem(pk,a.currentTime); lt=a.currentTime; }} }});
-        a.addEventListener('ended',function(){{ localStorage.removeItem(pk); }});
-        a.addEventListener('volumechange',function(){{ localStorage.setItem('vol',a.volume); }});
-        document.addEventListener('keydown',function(e){{
-          if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
-          if(e.code==='Space'){{ e.preventDefault(); a.paused?a.play():a.pause(); }}
-          if(e.code==='ArrowLeft'){{ a.currentTime=Math.max(0,a.currentTime-5); }}
-          if(e.code==='ArrowRight'){{ a.currentTime=Math.min(a.duration,a.currentTime+5); }}
-          if(e.code==='ArrowUp'){{ e.preventDefault(); a.volume=Math.min(1,a.volume+0.1); }}
-          if(e.code==='ArrowDown'){{ e.preventDefault(); a.volume=Math.max(0,a.volume-0.1); }}
-          if(e.code==='KeyM'){{ a.muted=!a.muted; }}
-        }});
-        </script>'''
+        # ArtPlayer 音频配置（禁用视频专属功能）
+        art_cfg = (
+            f"url:'{file_url}',"
+            f"title:'{safe_title}',"
+            "autoplay:true,autoPlayback:false,hotkey:true,pip:false,"
+            "fullscreen:false,fullscreenWeb:false,setting:true,flip:false,"
+            "playbackRate:true,aspectRatio:false,screenshot:false,"
+            "miniProgressBar:true,playsInline:true,mutex:true,"
+            "fastForward:false,lock:false,gesture:false"
+        )
+        if need_transcode:
+            content = f'''<div id="artContainer" style="width:100%;height:100%;display:none"></div>
+            <div id="preFallback" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
+                <span class="material-symbols-outlined" style="font-size:48px;color:#fb923c">warning</span>
+                <p style="font-size:14px">此音频编码不受浏览器支持</p>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+                  <button onclick="startTranscode()" style="padding:12px 28px;background:#4ade80;color:#000;border-radius:10px;font-size:14px;border:none;font-weight:600;cursor:pointer">转码播放</button>
+                  <a href="{dl_url}" style="padding:12px 28px;background:#6c8cff;color:#fff;border-radius:10px;font-size:14px;text-decoration:none;font-weight:600">下载</a>
+                </div>
+            </div>
+            <div id="loadingFallback" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
+                <span class="material-symbols-outlined" style="font-size:48px;color:#6c8cff;animation:spin 1s linear infinite">progress_activity</span>
+                <p style="font-size:14px">正在转码...</p>
+                <p style="font-size:13px;color:#6c8cff" id="elapsed">已用时 0 秒</p>
+            </div>
+            <style>@keyframes spin{{from{{transform:rotate(0deg)}}to{{transform:rotate(360deg)}}}}</style>
+            <script>
+            var art=null,elapsedTimer=null;
+            function startTranscode(){{
+              document.getElementById('preFallback').style.display='none';
+              document.getElementById('loadingFallback').style.display='flex';
+              document.getElementById('artContainer').style.display='block';
+              var sec=0;
+              elapsedTimer=setInterval(function(){{
+                sec++;var m=Math.floor(sec/60),s=sec%60;
+                document.getElementById('elapsed').textContent='已用时 '+(m?m+'分':'')+s+'秒';
+              }},1000);
+              art=new Artplayer({{{art_cfg},container:'#artContainer',url:'{transcode_url}'}});
+              art.on('video:playing',function(){{
+                if(elapsedTimer){{clearInterval(elapsedTimer);elapsedTimer=null;}}
+                document.getElementById('loadingFallback').style.display='none';
+                var pk='vp_'+location.pathname,ps=localStorage.getItem(pk);
+                if(ps) art.seek=parseFloat(ps);
+                var vol=localStorage.getItem('vol');if(vol) art.volume=parseFloat(vol);
+              }});
+              var lt=0;
+              art.on('video:timeupdate',function(){{if(art.currentTime-lt>3){{localStorage.setItem('vp_'+location.pathname,art.currentTime);lt=art.currentTime;}}}});
+              art.on('video:ended',function(){{localStorage.removeItem('vp_'+location.pathname);}});
+              art.on('video:volumechange',function(){{localStorage.setItem('vol',art.volume);}});
+            }}
+            </script>'''
+        else:
+            content = f'''<div id="artContainer" style="width:100%;flex:1"></div>
+            <div id="fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
+                <span class="material-symbols-outlined" style="font-size:48px;color:#f87171">error</span>
+                <p style="font-size:14px" id="errMsg">播放失败</p>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+                  <a href="{transcode_url}" style="padding:12px 28px;background:#4ade80;color:#000;border-radius:10px;font-size:14px;text-decoration:none;font-weight:600">转码播放</a>
+                  <a href="{dl_url}" style="padding:12px 28px;background:#6c8cff;color:#fff;border-radius:10px;font-size:14px;text-decoration:none;font-weight:600">下载</a>
+                </div>
+            </div>
+            <script>
+            var art=new Artplayer({{{art_cfg},container:'#artContainer'}});
+            var pk='vp_'+location.pathname,ps=localStorage.getItem(pk);
+            if(ps) art.seek=parseFloat(ps);
+            var vol=localStorage.getItem('vol');if(vol) art.volume=parseFloat(vol);
+            var lt=0;
+            art.on('video:timeupdate',function(){{if(art.currentTime-lt>3){{localStorage.setItem(pk,art.currentTime);lt=art.currentTime;}}}});
+            art.on('video:ended',function(){{localStorage.removeItem(pk);}});
+            art.on('video:volumechange',function(){{localStorage.setItem('vol',art.volume);}});
+            art.on('error',function(){{
+              art.destroy();
+              document.getElementById('artContainer').style.display='none';
+              document.getElementById('fallback').style.display='flex';
+            }});
+            </script>'''
     elif file_type == 'image':
         gallery_json = json.dumps(gallery or [], ensure_ascii=False)
         content = f'''<div id="galleryWrap" style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
@@ -1299,26 +1340,16 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
         if gallery and len(gallery) > 1:
             cur_idx = next((i for i, g in enumerate(gallery) if g['url'] == file_url), 0)
             gallery_title = f'{cur_idx + 1}/{len(gallery)} {safe_title}'
-        # 视频上下集导航
+        # 视频上下集导航 HTML（JS 逻辑在各类型 content 中处理）
         video_nav = ''
         if video_list and len(video_list) > 1:
-            video_json = json.dumps(video_list, ensure_ascii=False)
             cur_vid = next((i for i, v in enumerate(video_list) if v['url'] == file_url), 0)
             video_nav = f'''
 <div class="speed-bar" id="videoNav" style="bottom:60px">
     <button class="speed-btn" id="vidPrev" onclick="vidNav(-1)" style="display:{'inline-block' if cur_vid > 0 else 'none'}">&#9664; 上一集</button>
     <span style="color:rgba(255,255,255,0.7);font-size:12px;padding:0 8px" id="vidInfo">{cur_vid+1}/{len(video_list)}</span>
     <button class="speed-btn" id="vidNext" onclick="vidNav(1)" style="display:{'inline-block' if cur_vid < len(video_list)-1 else 'none'}">下一集 &#9654;</button>
-</div>
-<script>
-var vids={video_json};var vidx={cur_vid};
-function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length){{window.location.href=vids[n].play;}}}}
-document.addEventListener('keydown',function(e){{
-  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
-  if(e.key==='[') vidNav(-1);
-  if(e.key===']') vidNav(1);
-}});
-</script>'''
+</div>'''
         body = f'''
 <div class="player-page">
     <div class="player-header">
@@ -1329,7 +1360,10 @@ document.addEventListener('keydown',function(e){{
     {content}
     {video_nav}
 </div>'''
-        return page_shell(safe_title, body, 'body{background:#000;}')
+        extra_head = ''
+        if file_type in ('video', 'audio'):
+            extra_head = '<script src="https://cdn.jsdelivr.net/npm/artplayer@5/dist/artplayer.js"></script>'
+        return page_shell(safe_title, body, 'body{background:#000;}', extra_head=extra_head)
     else:
         reader_css = """
 .read-progress { position:fixed; top:0; left:0; right:0; height:3px; z-index:300; background:var(--surface3); }
