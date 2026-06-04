@@ -1133,11 +1133,33 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
             cur_vid = next((i for i, v in enumerate(video_list) if v['url'] == file_url), 0)
             video_nav_js = f'''
 var vids={video_json};var vidx={cur_vid};
-function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length){{vidx=n;art.switchUrl(vids[n].url);art.title=vids[n].name;
+function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length){{vidx=n;
+  cancelAutoNext();art.switchUrl(vids[n].url);art.title=vids[n].name;
   document.getElementById('vidInfo').textContent=(vidx+1)+'/'+vids.length;
   document.getElementById('vidPrev').style.display=vidx>0?'':'none';
   document.getElementById('vidNext').style.display=vidx<vids.length-1?'':'none';}}}}
-art.on('video:ended',function(){{if(vidx<vids.length-1) vidNav(1);}});
+var autoTimer=null,autoCountdown=0;
+function cancelAutoNext(){{if(autoTimer){{clearInterval(autoTimer);autoTimer=null;}}
+  var ov=document.getElementById('autoNextOverlay');if(ov)ov.style.display='none';}}
+function showAutoNext(){{
+  if(vidx>=vids.length-1)return;
+  autoCountdown=3;
+  var ov=document.getElementById('autoNextOverlay');
+  ov.style.display='flex';
+  ov.querySelector('.auto-next-title').textContent='即将播放: '+vids[vidx+1].name;
+  ov.querySelector('.auto-next-sec').textContent=autoCountdown+'秒后自动播放';
+  autoTimer=setInterval(function(){{
+    autoCountdown--;
+    if(autoCountdown<=0){{clearInterval(autoTimer);autoTimer=null;ov.style.display='none';vidNav(1);}}
+    else ov.querySelector('.auto-next-sec').textContent=autoCountdown+'秒后自动播放';
+  }},1000);
+}}
+var endedFired=false;
+art.on('video:ended',function(){{endedFired=true;showAutoNext();}});
+art.on('video:timeupdate',function(){{
+  if(!endedFired&&art.duration>0&&art.currentTime>=art.duration-0.5){{endedFired=true;showAutoNext();}}
+}});
+art.on('video:play',function(){{endedFired=false;cancelAutoNext();}});
 document.addEventListener('keydown',function(e){{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
   if(e.key==='[') vidNav(-1);
@@ -1349,6 +1371,11 @@ document.addEventListener('keydown',function(e){{
     <button class="speed-btn" id="vidPrev" onclick="vidNav(-1)" style="display:{'inline-block' if cur_vid > 0 else 'none'}">&#9664; 上一集</button>
     <span style="color:rgba(255,255,255,0.7);font-size:12px;padding:0 8px" id="vidInfo">{cur_vid+1}/{len(video_list)}</span>
     <button class="speed-btn" id="vidNext" onclick="vidNav(1)" style="display:{'inline-block' if cur_vid < len(video_list)-1 else 'none'}">下一集 &#9654;</button>
+</div>
+<div id="autoNextOverlay" style="display:none;position:absolute;inset:0;z-index:30;background:rgba(0,0,0,0.75);flex-direction:column;align-items:center;justify-content:center;gap:12px">
+    <span class="auto-next-title" style="color:#fff;font-size:16px;font-weight:600"></span>
+    <span class="auto-next-sec" style="color:rgba(255,255,255,0.7);font-size:14px"></span>
+    <button onclick="cancelAutoNext()" style="padding:10px 28px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:13px;cursor:pointer;margin-top:8px">取消</button>
 </div>'''
         body = f'''
 <div class="player-page">
