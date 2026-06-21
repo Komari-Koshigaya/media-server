@@ -1140,10 +1140,7 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
             cur_vid = next((i for i, v in enumerate(video_list) if v['url'] == file_url), 0)
             video_nav_js = f'''
 var vids={video_json};var vidx={cur_vid};
-function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length){{vidx=n;art.switchUrl(vids[n].url);art.title=vids[n].name;
-  document.getElementById('vidInfo').textContent=(vidx+1)+'/'+vids.length;
-  document.getElementById('vidPrev').style.display=vidx>0?'':'none';
-  document.getElementById('vidNext').style.display=vidx<vids.length-1?'':'none';}}}}
+function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length)location.href=vids[n].play;}}
 art.on('video:ended',function(){{if(vidx<vids.length-1) vidNav(1);}});
 document.addEventListener('keydown',function(e){{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
