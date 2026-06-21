@@ -25,6 +25,7 @@
 """
 
 import argparse
+import asyncio
 import logging
 from pathlib import Path
 
@@ -187,9 +188,17 @@ def main():
     server = MediaServer()
     app = create_app(server)
 
-    # aiohttp 内置的 ConnectionResetError 处理已足够，
-    # 无需全局 monkey-patch socket.socket.shutdown
-    web.run_app(app, host=args.host, port=args.port, print=lambda _: None)
+    # 忽略 Windows 上客户端断开连接时的 ConnectionResetError
+    def ignore_harmless_errors(loop, context):
+        exc = context.get('exception')
+        if isinstance(exc, (ConnectionResetError, BrokenPipeError)):
+            return  # 静默忽略
+        loop.default_exception_handler(context)
+
+    loop = asyncio.new_event_loop()
+    loop.set_exception_handler(ignore_harmless_errors)
+    asyncio.set_event_loop(loop)
+    web.run_app(app, host=args.host, port=args.port, print=lambda _: None, loop=loop)
 
 
 if __name__ == '__main__':
