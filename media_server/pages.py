@@ -1118,7 +1118,7 @@ def build_browse_html(share_idx: int, share_name: str, rel_path: str, entries: l
     return page_shell(f'{safe_share_name} - Media Server', body)
 
 
-def build_player_html(title: str, file_url: str, file_type: str, back_href: str = '/', codec_warn: str = '', gallery: list = None, video_list: list = None) -> str:
+def build_player_html(title: str, file_url: str, file_type: str, back_href: str = '/', gallery: list = None, video_list: list = None) -> str:
     safe_title = html_mod.escape(title)
     dl_url = file_url + ('&' if '?' in file_url else '?') + 'download=1'
     transcode_url = file_url + ('&' if '?' in file_url else '?') + 'transcode=1'
@@ -1151,8 +1151,7 @@ document.addEventListener('keydown',function(e){{
   if(e.key===']') vidNav(1);
 }});'''
 
-        codec_hint = f'<div style="position:absolute;top:50px;left:50%;transform:translateX(-50%);background:rgba(251,146,60,0.9);color:#000;padding:6px 16px;border-radius:8px;font-size:12px;z-index:100;pointer-events:none;animation:fadeIn 0.3s">{html_mod.escape(codec_warn)}</div>' if codec_warn else ''
-        content = f'''{codec_hint}<div id="artContainer" style="width:100%;flex:1"></div>
+        content = f'''<div id="artContainer" style="width:100%;flex:1"></div>
             <div id="fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
                 <span class="material-symbols-outlined" style="font-size:48px;color:#f87171">error</span>
                 <p style="font-size:14px" id="errMsg">播放失败</p>
@@ -1188,8 +1187,7 @@ document.addEventListener('keydown',function(e){{
             "miniProgressBar:true,playsInline:true,mutex:true,"
             "fastForward:false,lock:false,gesture:false"
         )
-        codec_hint = f'<div style="position:absolute;top:50px;left:50%;transform:translateX(-50%);background:rgba(251,146,60,0.9);color:#000;padding:6px 16px;border-radius:8px;font-size:12px;z-index:100;pointer-events:none;animation:fadeIn 0.3s">{html_mod.escape(codec_warn)}</div>' if codec_warn else ''
-        content = f'''{codec_hint}<div id="artContainer" style="width:100%;flex:1"></div>
+        content = f'''<div id="artContainer" style="width:100%;flex:1"></div>
             <div id="fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
                 <span class="material-symbols-outlined" style="font-size:48px;color:#f87171">error</span>
                 <p style="font-size:14px" id="errMsg">播放失败</p>
