@@ -324,17 +324,16 @@ class MediaServer:
         if ftype == 'file':
             ftype = 'text'
 
-        # 视频文件：探测编码，判断手机浏览器是否需要转码
-        need_transcode = False
+        # 视频文件：探测编码，提示可能不兼容但不阻止播放
+        codec_warn = ''
         if ftype == 'video':
             info = await async_probe_video_codec(str(file_path))
             vc = info.get('vcodec', '').lower()
             ac = info.get('acodec', '').lower()
-            # 手机浏览器只支持 H.264 视频 + AAC 音频
             if vc and not ('h264' in vc or 'avc' in vc):
-                need_transcode = True
+                codec_warn = f'视频编码 {vc.split()[0]} 可能不受部分浏览器支持'
             elif ac and 'aac' not in ac:
-                need_transcode = True
+                codec_warn = f'音频编码 {ac.split()[0]} 可能不受部分浏览器支持'
 
         file_url = f'/raw/{share_idx}/{quote(file_path_str, safe="/")}'
         safe_name = html.escape(file_path.name)
@@ -374,7 +373,7 @@ class MediaServer:
                 except (PermissionError, OSError):
                     pass
 
-        html_content = build_player_html(safe_name, file_url, ftype, back_href=back, need_transcode=need_transcode, gallery=gallery, video_list=video_list)
+        html_content = build_player_html(safe_name, file_url, ftype, back_href=back, codec_warn=codec_warn, gallery=gallery, video_list=video_list)
         return web.Response(text=html_content, content_type='text/html', charset='utf-8')
 
     async def handle_raw(self, request: web.Request) -> web.Response:

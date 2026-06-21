@@ -1118,7 +1118,7 @@ def build_browse_html(share_idx: int, share_name: str, rel_path: str, entries: l
     return page_shell(f'{safe_share_name} - Media Server', body)
 
 
-def build_player_html(title: str, file_url: str, file_type: str, back_href: str = '/', need_transcode: bool = False, gallery: list = None, video_list: list = None) -> str:
+def build_player_html(title: str, file_url: str, file_type: str, back_href: str = '/', codec_warn: str = '', gallery: list = None, video_list: list = None) -> str:
     safe_title = html_mod.escape(title)
     dl_url = file_url + ('&' if '?' in file_url else '?') + 'download=1'
     transcode_url = file_url + ('&' if '?' in file_url else '?') + 'transcode=1'
@@ -1140,7 +1140,10 @@ def build_player_html(title: str, file_url: str, file_type: str, back_href: str 
             cur_vid = next((i for i, v in enumerate(video_list) if v['url'] == file_url), 0)
             video_nav_js = f'''
 var vids={video_json};var vidx={cur_vid};
-function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length)location.href=vids[n].play;}}
+function vidNav(d){{var n=vidx+d;if(n>=0&&n<vids.length){{vidx=n;art.switchUrl(vids[n].url);art.title=vids[n].name;
+  document.getElementById('vidInfo').textContent=(vidx+1)+'/'+vids.length;
+  document.getElementById('vidPrev').style.display=vidx>0?'':'none';
+  document.getElementById('vidNext').style.display=vidx<vids.length-1?'':'none';}}}}
 art.on('video:ended',function(){{if(vidx<vids.length-1) vidNav(1);}});
 document.addEventListener('keydown',function(e){{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
@@ -1148,52 +1151,8 @@ document.addEventListener('keydown',function(e){{
   if(e.key===']') vidNav(1);
 }});'''
 
-        if need_transcode:
-            content = f'''<div id="artContainer" style="width:100%;height:100%;display:none"></div>
-            <div id="preFallback" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
-                <span class="material-symbols-outlined" style="font-size:48px;color:#fb923c">warning</span>
-                <p style="font-size:14px">此视频编码不受手机浏览器支持</p>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-                  <button onclick="startTranscode()" style="padding:12px 28px;background:#4ade80;color:#000;border-radius:10px;font-size:14px;border:none;font-weight:600;cursor:pointer">转码播放</button>
-                  <a href="{dl_url}" style="padding:12px 28px;background:#6c8cff;color:#fff;border-radius:10px;font-size:14px;text-decoration:none;font-weight:600">下载到手机</a>
-                </div>
-                <p style="font-size:12px;color:#666">大文件转码可能需要数分钟</p>
-            </div>
-            <div id="loadingFallback" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
-                <span class="material-symbols-outlined" style="font-size:48px;color:#6c8cff;animation:spin 1s linear infinite">progress_activity</span>
-                <p style="font-size:14px">正在转码...</p>
-                <p style="font-size:13px;color:#6c8cff" id="elapsed">已用时 0 秒</p>
-                <p style="font-size:12px;color:#666">请勿关闭此页面，转码完成后自动播放</p>
-            </div>
-            <style>@keyframes spin{{from{{transform:rotate(0deg)}}to{{transform:rotate(360deg)}}}}</style>
-            <script>
-            var art=null,elapsedTimer=null;
-            function startTranscode(){{
-              document.getElementById('preFallback').style.display='none';
-              document.getElementById('loadingFallback').style.display='flex';
-              document.getElementById('artContainer').style.display='block';
-              var sec=0;
-              elapsedTimer=setInterval(function(){{
-                sec++;var m=Math.floor(sec/60),s=sec%60;
-                document.getElementById('elapsed').textContent='已用时 '+(m?m+'分':'')+s+'秒';
-              }},1000);
-              art=new Artplayer({{{art_cfg},container:'#artContainer',url:'{transcode_url}'}});
-              art.on('video:playing',function(){{
-                if(elapsedTimer){{clearInterval(elapsedTimer);elapsedTimer=null;}}
-                document.getElementById('loadingFallback').style.display='none';
-                var pk='vp_'+location.pathname,ps=localStorage.getItem(pk);
-                if(ps) art.seek=parseFloat(ps);
-                var vol=localStorage.getItem('vol');if(vol) art.volume=parseFloat(vol);
-              }});
-              var lt=0;
-              art.on('video:timeupdate',function(){{if(art.currentTime-lt>3){{localStorage.setItem('vp_'+location.pathname,art.currentTime);lt=art.currentTime;}}}});
-              art.on('video:ended',function(){{localStorage.removeItem('vp_'+location.pathname);}});
-              art.on('video:volumechange',function(){{localStorage.setItem('vol',art.volume);}});
-              {video_nav_js}
-            }}
-            </script>'''
-        else:
-            content = f'''<div id="artContainer" style="width:100%;flex:1"></div>
+        codec_hint = f'<div style="position:absolute;top:50px;left:50%;transform:translateX(-50%);background:rgba(251,146,60,0.9);color:#000;padding:6px 16px;border-radius:8px;font-size:12px;z-index:100;pointer-events:none;animation:fadeIn 0.3s">{html_mod.escape(codec_warn)}</div>' if codec_warn else ''
+        content = f'''{codec_hint}<div id="artContainer" style="width:100%;flex:1"></div>
             <div id="fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
                 <span class="material-symbols-outlined" style="font-size:48px;color:#f87171">error</span>
                 <p style="font-size:14px" id="errMsg">播放失败</p>
@@ -1229,49 +1188,8 @@ document.addEventListener('keydown',function(e){{
             "miniProgressBar:true,playsInline:true,mutex:true,"
             "fastForward:false,lock:false,gesture:false"
         )
-        if need_transcode:
-            content = f'''<div id="artContainer" style="width:100%;height:100%;display:none"></div>
-            <div id="preFallback" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
-                <span class="material-symbols-outlined" style="font-size:48px;color:#fb923c">warning</span>
-                <p style="font-size:14px">此音频编码不受浏览器支持</p>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-                  <button onclick="startTranscode()" style="padding:12px 28px;background:#4ade80;color:#000;border-radius:10px;font-size:14px;border:none;font-weight:600;cursor:pointer">转码播放</button>
-                  <a href="{dl_url}" style="padding:12px 28px;background:#6c8cff;color:#fff;border-radius:10px;font-size:14px;text-decoration:none;font-weight:600">下载</a>
-                </div>
-            </div>
-            <div id="loadingFallback" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
-                <span class="material-symbols-outlined" style="font-size:48px;color:#6c8cff;animation:spin 1s linear infinite">progress_activity</span>
-                <p style="font-size:14px">正在转码...</p>
-                <p style="font-size:13px;color:#6c8cff" id="elapsed">已用时 0 秒</p>
-            </div>
-            <style>@keyframes spin{{from{{transform:rotate(0deg)}}to{{transform:rotate(360deg)}}}}</style>
-            <script>
-            var art=null,elapsedTimer=null;
-            function startTranscode(){{
-              document.getElementById('preFallback').style.display='none';
-              document.getElementById('loadingFallback').style.display='flex';
-              document.getElementById('artContainer').style.display='block';
-              var sec=0;
-              elapsedTimer=setInterval(function(){{
-                sec++;var m=Math.floor(sec/60),s=sec%60;
-                document.getElementById('elapsed').textContent='已用时 '+(m?m+'分':'')+s+'秒';
-              }},1000);
-              art=new Artplayer({{{art_cfg},container:'#artContainer',url:'{transcode_url}'}});
-              art.on('video:playing',function(){{
-                if(elapsedTimer){{clearInterval(elapsedTimer);elapsedTimer=null;}}
-                document.getElementById('loadingFallback').style.display='none';
-                var pk='vp_'+location.pathname,ps=localStorage.getItem(pk);
-                if(ps) art.seek=parseFloat(ps);
-                var vol=localStorage.getItem('vol');if(vol) art.volume=parseFloat(vol);
-              }});
-              var lt=0;
-              art.on('video:timeupdate',function(){{if(art.currentTime-lt>3){{localStorage.setItem('vp_'+location.pathname,art.currentTime);lt=art.currentTime;}}}});
-              art.on('video:ended',function(){{localStorage.removeItem('vp_'+location.pathname);}});
-              art.on('video:volumechange',function(){{localStorage.setItem('vol',art.volume);}});
-            }}
-            </script>'''
-        else:
-            content = f'''<div id="artContainer" style="width:100%;flex:1"></div>
+        codec_hint = f'<div style="position:absolute;top:50px;left:50%;transform:translateX(-50%);background:rgba(251,146,60,0.9);color:#000;padding:6px 16px;border-radius:8px;font-size:12px;z-index:100;pointer-events:none;animation:fadeIn 0.3s">{html_mod.escape(codec_warn)}</div>' if codec_warn else ''
+        content = f'''{codec_hint}<div id="artContainer" style="width:100%;flex:1"></div>
             <div id="fallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:16px">
                 <span class="material-symbols-outlined" style="font-size:48px;color:#f87171">error</span>
                 <p style="font-size:14px" id="errMsg">播放失败</p>
