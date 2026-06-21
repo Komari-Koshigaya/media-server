@@ -791,7 +791,16 @@ async function removeShare(idx) {
         const data = await r.json();
         if (data.ok) {
             showMsg('已移除', true);
-            setTimeout(() => location.href = '/admin?t=' + Date.now(), 500);
+            // 直接从 DOM 移除该项，不用跳转
+            const el = document.getElementById('share-' + idx);
+            if (el) el.remove();
+            // 更新统计数字
+            const items = document.querySelectorAll('.share-item');
+            document.querySelector('.stat-num').textContent = items.length;
+            // 如果列表空了，显示提示
+            if (items.length === 0) {
+                document.getElementById('shareList').innerHTML = '<div style="padding:30px;text-align:center;color:var(--text3);font-size:13px;">暂无共享目录，点击下方按钮添加</div>';
+            }
         }
     } catch(e) { showMsg('网络错误', false); }
 }
@@ -863,7 +872,8 @@ async function confirmPick() {
         if (data.ok) {
             closePicker();
             showMsg('添加成功: ' + pickPath, true);
-            setTimeout(() => location.reload(), 600);
+            // 重新加载页面获取最新列表
+            setTimeout(() => location.replace('/admin'), 300);
         } else { showMsg(data.msg || '添加失败', false); }
     } catch(e) { showMsg('网络错误', false); }
 }
@@ -900,9 +910,6 @@ def page_shell(title: str, body: str, extra_css: str = '', extra_head: str = '')
 <style>{BASE_CSS}{extra_css}</style>
 </head>
 <body>{body}
-<script>
-if('serviceWorker' in navigator){{navigator.serviceWorker.register('/sw.js').catch(function(){{}});}}
-</script>
 </body>
 </html>'''
 

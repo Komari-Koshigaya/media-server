@@ -31,6 +31,8 @@ pip install aiohttp aiofiles imageio-ffmpeg ebooklib PyMuPDF beautifulsoup4 lxml
 python -m media_server
 ```
 
+Windows 用户也可以双击 `start.bat` 启动（自动检测并关闭占用端口的旧进程）。
+
 启动后终端会显示：
 - 访问地址（如 `http://192.168.1.7:8080`）
 - 自动生成的登录密码
@@ -81,6 +83,7 @@ media_server/
   pages.py       — HTML 页面模板
   handlers.py    — 路由处理器
   app.py         — 应用工厂和中间件
+  static/        — 静态资源（favicon、manifest）
 tests/           — 84 个测试用例
 ```
 
@@ -103,6 +106,18 @@ Set-NetConnectionProfile -NetworkCategory Private
 ```bash
 python -m pytest tests/ -v    # 运行测试
 python -m pytest tests/ -q    # 静默模式
+```
+
+## 常见问题
+
+**管理后台移除目录后刷新还是显示？**
+浏览器 Service Worker 可能缓存了页面。清除方法：F12 → Application → Service Workers → Unregister，然后刷新页面。
+
+**start.bat 启动报端口占用？**
+`start.bat` 会自动检测并关闭占用端口的旧进程，如果仍然报错，手动执行：
+```powershell
+netstat -ano | findstr ":18080"
+taskkill /F /PID <进程ID>
 ```
 
 ## License

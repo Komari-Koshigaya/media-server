@@ -1,26 +1,21 @@
 const CACHE_NAME = 'media-server-v1';
-const SHELL = [
-  '/',
-  '/admin',
-  'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined'
-];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(SHELL)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(
-    ks.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-  )));
-  self.clients.claim();
+  e.waitUntil(
+    caches.delete(CACHE_NAME).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // 只缓存 GET 请求，不缓存 API 和文件流
   if (e.request.method !== 'GET') return;
+  // HTML 页面始终走网络，不缓存
+  if (url.pathname === '/' || url.pathname === '/admin' || url.pathname.startsWith('/play/')) return;
+  // API、文件流不缓存
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/raw/') || url.pathname.startsWith('/thumb/') || url.pathname.startsWith('/upload')) return;
 
   e.respondWith(
@@ -30,6 +25,6 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => caches.match('/')))
+    }))
   );
 });

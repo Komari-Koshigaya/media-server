@@ -21,6 +21,7 @@ Python 异步 Web 服务器，通过局域网在 PC 和手机之间：
 python -m media_server                    # 默认端口 8080，密码自动生成
 python -m media_server --port 18080       # 自定义端口
 python -m media_server --password 1234    # 自定义密码
+start.bat                                 # Windows 快捷启动（自动检测并杀掉占用端口的旧进程）
 python -m pytest tests/ -v                # 运行全部测试（84 个）
 python -m pytest tests/ -q                # 静默模式
 ```
@@ -47,6 +48,7 @@ media_server/
   pages.py       - CSS 主题 + HTML 模板 + JS（上传、画廊、排序、文件夹选择器）
   handlers.py    - MediaServer 类，18 个路由处理器
   app.py         - create_app() 工厂、鉴权中间件、错误中间件、CLI
+  static/        - 静态资源（favicon.svg、manifest.json、sw.js）
 tests/
   conftest.py    - 测试夹具（tmp_config、mock_config）
   test_config.py - 配置模块测试（8 个）
@@ -88,6 +90,7 @@ tests/
 - 只转音频的视频（`-c:v copy`）暂停恢复可能从头开始（关键帧稀疏），用户偏好：优先速度
 - Windows 防火墙需放行端口：`netsh advfirewall firewall add rule name="Media Server" dir=in action=allow protocol=tcp localport=18080`
 - 网络需设为"专用"配置文件：`Set-NetConnectionProfile -NetworkCategory Private`
+- Service Worker 已移除，旧版浏览器可能仍注册了 sw.js，需手动清除：F12 → Application → Service Workers → Unregister
 
 ## 代码规范
 - 中文注释和 UI 文案
@@ -96,6 +99,8 @@ tests/
 - 异步 handler 用 `async def`，同步工具函数用 `def`
 - 错误：路由 `raise web.HTTPXxx()`，API `web.json_response({'ok': ...})`
 - XSS 防护：所有用户输入经 `html.escape()` 转义后插入 HTML
+- 缓存控制：管理后台和首页 HTML 响应加 `Cache-Control: no-cache, no-store, must-revalidate` + `Pragma` + `Expires`，避免浏览器缓存旧数据
+- 管理后台增删共享目录后直接 JS 更新 DOM，不跳转刷新
 
 ## 待办事项
 - [ ] 图片缩略图：用 Pillow 生成 320px 缩略图缓存，大图片目录不再加载原图
